@@ -10,6 +10,8 @@ import Navbar from './components/Navbar.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import EnrolledCourses from './components/EnrolledCourses.jsx';
 import CourseProgress from './components/CourseProgress.jsx';
+// import CourseCard from './components/CourseCard.jsx';
+import CourseDetails from './components/CourseDetails.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -30,6 +32,7 @@ function App() {
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/courses/:id" element={<CourseDetails/>} />
         <Route path="/login" element={<AuthForm isRegister={false} />} />
         <Route path="/register" element={<AuthForm isRegister={true} />} />
         <Route

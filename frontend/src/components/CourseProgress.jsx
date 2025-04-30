@@ -7,7 +7,6 @@ export default function CourseProgress() {
   const { user, loading: authLoading } = useAuth();
   const [courseProgress, setCourseProgress] = useState(null);
   const [sessions, setSessions] = useState([]);
-  const[s,setS]=useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { courseId } = useParams();
@@ -23,14 +22,22 @@ export default function CourseProgress() {
           Authorization: `Bearer ${user.token}`,
         },
       });
-      console.log('API Response:', response.data); // Debug log to see the full response structure
-      setCourseProgress(response.data); // Assuming the overall progress is here
-      setSessions(response.data.progress || []);
-      setS(response.data.data.sessions);
-    //   console.log(response.data.data.sessions[0]);
-       // Assuming 'progress' contains session progress
+
+      const { progress = [], sessions = [], overallProgress = 0 } = response.data.data;
+
+      // Merge progress info into session data
+      const sessionsWithProgress = sessions.map((session) => {
+        const matched = progress.find((p) => p.sessionId === session.id);
+        return {
+          ...session,
+          isCompleted: matched?.isCompleted || false,
+        };
+      });
+
+      setCourseProgress({ overallProgress });
+      setSessions(sessionsWithProgress);
     } catch (err) {
-      console.error('API Error:', err); // Debug log to see errors
+      console.error('API Error:', err);
       setError(err.response?.data?.error || 'Failed to fetch course progress');
     } finally {
       setLoading(false);
@@ -39,49 +46,20 @@ export default function CourseProgress() {
 
   const markSessionComplete = async (sessionId) => {
     try {
-      // Check if progress exists for this session
-      const res = await axios.get(`${API_URL}/progress/${sessionId}`, {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      });
-  
-      // Update existing progress
-      const progressId = res.data.id;
-      await axios.put(
-        `${API_URL}/progress/${progressId}`,
-        { isCompleted: true },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
+      // Create or update progress record with isCompleted: true
+      await axios.post(
+        `${API_URL}/progress`,
+        { sessionId, isCompleted: true },
+        { headers: { Authorization: `Bearer ${user.token}` } }
       );
+
+      // Refresh progress
+      await fetchCourseProgress();
     } catch (err) {
-      // If progress doesn't exist, create a new one
-      if (err.response?.status === 404) {
-        await axios.post(
-          `${API_URL}/progress`,
-          {
-            sessionId, // this is correct — must be sent in body
-            isCompleted: true,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-      } else {
-        console.error('Error updating/creating progress:', err);
-        return;
-      }
+      console.error('Error marking session complete:', err.response?.data || err.message);
+      setError('Failed to update progress');
     }
-  
-    fetchCourseProgress(); // Refresh data after updating
   };
-  
-  
 
   useEffect(() => {
     if (user) {
@@ -97,7 +75,6 @@ export default function CourseProgress() {
   return (
     <div className="max-w-5xl mx-auto bg-white shadow p-6 rounded-lg mt-6">
       <h2 className="text-2xl font-bold mb-4">Course Progress</h2>
-      <h3 className="text-xl mb-4">{courseProgress.title}</h3>
 
       {/* Progress Bar */}
       <div className="mb-6">
@@ -113,43 +90,40 @@ export default function CourseProgress() {
       {/* Sessions List */}
       <h4 className="font-medium mb-4">Sessions</h4>
       <ul className="space-y-4">
-  {s.length === 0 ? (
-    <li>No sessions available.</li>
-  ) : (
-    s.map((session) => (
-      <li key={session.id} className="flex justify-between items-start gap-4 p-4 border rounded">
-        <div className="flex-1">
-          <h5 className="font-semibold mb-1">Session #{session.id}</h5>
-          <p className="text-blue-600 underline">
-            <a href={session.youtubeLink} target="_blank" rel="noopener noreferrer">
-              Watch Video
-            </a>
-          </p>
-          <p className="mt-1 text-gray-700">{session.explanation}</p>
-          <p className="text-sm text-gray-600 mt-1">
-            {session.progress
-              ? `Progress: ${session.progress.isCompleted ? '✅ Completed' : '⏳ In Progress'}`
-              : '⏳ Not started'}
-          </p>
-        </div>
+        {sessions.length === 0 ? (
+          <li>No sessions available.</li>
+        ) : (
+          sessions.map((session) => (
+            <li key={session.id} className="flex justify-between items-start gap-4 p-4 border rounded">
+              <div className="flex-1">
+                <h5 className="font-semibold mb-1">{session.title}</h5>
+                <p className="text-blue-600 underline">
+                  <a href={session.youtubeLink} target="_blank" rel="noopener noreferrer">
+                    Watch Video
+                  </a>
+                </p>
+                <p className="mt-1 text-gray-700">{session.explanation}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {session.isCompleted ? '✅ Completed' : '⏳ Not completed'}
+                </p>
+              </div>
 
-        {!session.progress?.isCompleted && (
-          <button
-            onClick={() => markSessionComplete(session.id)}
-            className="bg-blue-500 text-white px-4 py-2 rounded self-start"
-          >
-            Mark as Complete
-          </button>
+              {!session.isCompleted && (
+                <button
+                  onClick={() => markSessionComplete(session.id)}
+                  className="bg-blue-500 text-white px-4 py-2 rounded self-start"
+                >
+                  Mark as Complete
+                </button>
+              )}
+            </li>
+          ))
         )}
-      </li>
-    ))
-  )}
-</ul>
-
+      </ul>
 
       <div className="mt-6">
         <button
-          onClick={() => navigate('/enrolled-courses')} // Use navigate instead of history
+          onClick={() => navigate('/enrolled-courses')}
           className="bg-gray-500 text-white px-4 py-2 rounded"
         >
           Back to Enrolled Courses
