@@ -1,4 +1,3 @@
-// In AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
@@ -10,13 +9,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // Axios instance with base config
   const axiosAuth = axios.create({
     baseURL: API_URL,
     withCredentials: true,
   });
 
-  // Store ongoing refresh promise
   let isRefreshing = false;
   let refreshSubscribers = [];
 
@@ -29,13 +26,27 @@ export const AuthProvider = ({ children }) => {
     refreshSubscribers = [];
   };
 
-  // Attach refresh-token logic to interceptor
+  const updateUserToken = (token, userData) => {
+    const updatedUser = { ...userData, token };
+    console.log('Updating user state:', updatedUser);
+    setUser(updatedUser);
+    Cookies.set('user', JSON.stringify(updatedUser), {
+      expires: 7,
+      secure: import.meta.env.PROD,
+      sameSite: 'Strict',
+    });
+    Cookies.set('token', token, {
+      expires: 7,
+      secure: import.meta.env.PROD,
+      sameSite: 'Strict',
+    });
+  };
+
   useEffect(() => {
     const interceptor = axiosAuth.interceptors.response.use(
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
-
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
@@ -44,23 +55,25 @@ export const AuthProvider = ({ children }) => {
           originalRequest._retry = true;
 
           if (isRefreshing) {
-            // Queue the request until refresh completes
             return new Promise((resolve, reject) => {
               subscribeTokenRefresh((err, token) => {
                 if (err) return reject(err);
+                originalRequest.headers['Authorization'] = `Bearer ${token}`;
                 resolve(axiosAuth(originalRequest));
               });
             });
           }
 
           isRefreshing = true;
-
           try {
             console.log('🔄 Interceptor: refreshing token...');
             const response = await axiosAuth.post('/auth/refresh-token');
-            console.log('🔄 Refresh successful:', response.data);
+            console.log('🔄 Refresh response:', response.data);
+            const { user: refreshedUser, token } = response.data.data;
+            updateUserToken(token, refreshedUser);
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
             isRefreshing = false;
-            onTokenRefreshed(null, response.data);
+            onTokenRefreshed(null, token);
             return axiosAuth(originalRequest);
           } catch (refreshError) {
             console.error('🔴 Interceptor refresh failed:', {
@@ -70,15 +83,10 @@ export const AuthProvider = ({ children }) => {
             });
             isRefreshing = false;
             onTokenRefreshed(refreshError, null);
-            if (refreshError.response?.status === 403 || refreshError.response?.status === 401) {
-              console.log('Invalid or expired refresh token, logging out');
-              logout();
-              window.location.href = '/login';
-            }
+            logout();
             return Promise.reject(refreshError);
           }
         }
-
         return Promise.reject(error);
       }
     );
@@ -88,29 +96,85 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Initial auth check
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const storedUser = Cookies.get('user');
+        const storedUserRaw = Cookies.get('user');
+        console.log('Raw user cookie:', storedUserRaw);
+        let storedUser = null;
+        if (storedUserRaw) {
+          try {
+            storedUser = JSON.parse(storedUserRaw);
+            console.log('Parsed user cookie:', storedUser);
+          } catch (parseError) {
+            console.error('❌ Failed to parse user cookie:', parseError);
+            Cookies.remove('user');
+            Cookies.remove('token');
+          }
+        }
+
         if (storedUser) {
-          const response = await axiosAuth.get('/auth/validate');
-          const { user: validatedUser } = response.data.data;
-          const cleanUser = {
-            id: validatedUser.id,
-            email: validatedUser.email,
-            role: validatedUser.role,
-            name: validatedUser.name,
-          };
-          setUser(cleanUser);
-          Cookies.set('user', JSON.stringify(cleanUser), {
-            expires: 7,
-            secure: import.meta.env.PROD,
-            sameSite: 'Strict',
-          });
+          try {
+            const response = await axiosAuth.get('/auth/validate');
+            console.log('🔍 Validate response:', response.data);
+            const { user: validatedUser, token } = response.data.data;
+            const cleanUser = {
+              id: validatedUser.id,
+              email: validatedUser.email,
+              role: validatedUser.role,
+              name: validatedUser.name,
+              token,
+            };
+            console.log('Setting user from validate:', cleanUser);
+            setUser(cleanUser);
+            Cookies.set('user', JSON.stringify(cleanUser), {
+              expires: 7,
+              secure: import.meta.env.PROD,
+              sameSite: 'Strict',
+            });
+            Cookies.set('token', token, {
+              expires: 7,
+              secure: import.meta.env.PROD,
+              sameSite: 'Strict',
+            });
+          } catch (validateError) {
+            console.error('❌ Validation failed:', validateError);
+            if (validateError.response?.status === 401) {
+              console.log('🔄 Attempting token refresh...');
+              try {
+                const response = await axiosAuth.post('/auth/refresh-token');
+                console.log('🔄 Refresh response:', response.data);
+                const { user: refreshedUser, token } = response.data.data;
+                const cleanUser = {
+                  id: refreshedUser.id,
+                  email: refreshedUser.email,
+                  role: refreshedUser.role,
+                  name: refreshedUser.name,
+                  token,
+                };
+                console.log('Setting user from refresh:', cleanUser);
+                setUser(cleanUser);
+                Cookies.set('user', JSON.stringify(cleanUser), {
+                  expires: 7,
+                  secure: import.meta.env.PROD,
+                  sameSite: 'Strict',
+                });
+                Cookies.set('token', token, {
+                  expires: 7,
+                  secure: import.meta.env.PROD,
+                  sameSite: 'Strict',
+                });
+              } catch (refreshError) {
+                console.error('❌ Refresh failed:', refreshError);
+                logout();
+              }
+            } else {
+              logout();
+            }
+          }
         }
       } catch (err) {
-        console.error('❌ Validation failed:', err);
+        console.error('❌ Initialization error:', err);
         logout();
       } finally {
         setLoading(false);
@@ -120,11 +184,16 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  const login = (userData) => {
-    const { id, email, role, name } = userData;
-    const cleanUser = { id, email, role, name };
+  const login = (userData, token) => {
+    const cleanUser = { ...userData, token };
+    console.log('Logging in user:', cleanUser);
     setUser(cleanUser);
     Cookies.set('user', JSON.stringify(cleanUser), {
+      expires: 7,
+      secure: import.meta.env.PROD,
+      sameSite: 'Strict',
+    });
+    Cookies.set('token', token, {
       expires: 7,
       secure: import.meta.env.PROD,
       sameSite: 'Strict',
@@ -132,8 +201,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('Logging out, clearing user state and cookies');
     setUser(null);
     Cookies.remove('user');
+    Cookies.remove('token');
+    Cookies.remove('refreshToken');
   };
 
   return (

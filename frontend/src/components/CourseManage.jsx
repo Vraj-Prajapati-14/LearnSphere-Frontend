@@ -1,6 +1,5 @@
 import { useEffect, useState, Component } from 'react';
-import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import CourseHeader from './CourseHeader.jsx';
 import SessionsSection from './SessionsSection.jsx';
@@ -18,7 +17,7 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="text-center p-4 text-red-500">
+        <div className="text-center p-4 text-red-500 bg-red-100 rounded-md">
           <p>Something went wrong: {this.state.error?.message || 'Unknown error'}</p>
           <p>Please try refreshing the page or contact support.</p>
         </div>
@@ -30,7 +29,8 @@ class ErrorBoundary extends Component {
 
 export default function CourseManage() {
   const { courseId } = useParams();
-  const { user ,loading } = useAuth();
+  const navigate = useNavigate();
+  const { user, loading, axiosAuth } = useAuth();
   const [course, setCourse] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
@@ -42,24 +42,21 @@ export default function CourseManage() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
-  const API_URL = import.meta.env.VITE_API_URL;
 
   const fetchCourseData = async () => {
     try {
-      const { data: courseData } = await axios.get(`${API_URL}/courses/${courseId}`, {
-        withCredentials: true,
-      });
+      const { data: courseData } = await axiosAuth.get(`/courses/${courseId}`);
+      console.log('Course data:', courseData);
       setCourse(courseData.data);
 
-      const sessionsRes = await axios.get(`${API_URL}/courses/${courseId}/sessions`, {
-        withCredentials: true,
-      });
+      const sessionsRes = await axiosAuth.get(`/courses/${courseId}/sessions`);
+      console.log('Sessions data:', sessionsRes.data);
       setSessions(Array.isArray(sessionsRes.data.data) ? sessionsRes.data.data : []);
 
-      const enrollmentsRes = await axios.get(`${API_URL}/enrollments`, {
+      const enrollmentsRes = await axiosAuth.get(`/enrollments`, {
         params: { courseId },
-        withCredentials: true,
       });
+      console.log('Enrollments data:', enrollmentsRes.data);
       const enrollmentData = enrollmentsRes.data.data;
       if (Array.isArray(enrollmentData)) {
         setEnrollments(enrollmentData);
@@ -71,9 +68,8 @@ export default function CourseManage() {
         setEnrollmentsError('Invalid enrollments data received');
       }
 
-      const progressRes = await axios.get(`${API_URL}/progress/course/${courseId}/progress`, {
-        withCredentials: true,
-      });
+      const progressRes = await axiosAuth.get(`/progress/course/${courseId}/progress`);
+      console.log('Progress data:', progressRes.data);
       const progressDataResult = progressRes.data.data;
       if (Array.isArray(progressDataResult)) {
         const progressMap = progressDataResult.reduce((acc, item) => {
@@ -89,9 +85,18 @@ export default function CourseManage() {
         setProgressError('Invalid progress data received');
       }
     } catch (err) {
-      console.error('Error fetching course data:', err);
+      console.error('Error fetching course data:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.response?.config?.url,
+      });
       if (err.response?.status === 403) {
         setError('Unauthorized: You are not the instructor of this course');
+      } else if (err.response?.status === 404) {
+        setError('Course not found');
+      } else if (err.response?.status === 500) {
+        setError('Server error: Failed to load course data. Please try again later.');
       } else {
         setError(err.response?.data?.error || 'Failed to load course data');
       }
@@ -106,39 +111,64 @@ export default function CourseManage() {
   };
 
   useEffect(() => {
-    if (loading) return; // wait for auth to load
-    if (user && user.token) {
+    if (loading) return;
+    if (user) {
+      console.log('CourseManage user:', user);
       fetchCourseData();
     } else {
       setError('Please log in to manage courses');
+      navigate('/login');
     }
-  }, [courseId, user, loading]);
+  }, [courseId, user, loading, navigate]);
 
   const handleDeleteSession = async (sessionId) => {
     try {
-      await axios.delete(`${API_URL}/courses/${courseId}/sessions/${sessionId}`, {
-        withCredentials: true,
-      });
+      const response = await axiosAuth.delete(`/courses/${courseId}/sessions/${sessionId}`);
       setSessions(sessions.filter((s) => s.id !== sessionId));
-      alert('Session deleted successfully');
+      alert(response.data.message || 'Session deleted successfully');
     } catch (err) {
-      alert('Error deleting session');
+      console.error('Error deleting session:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.response?.config?.url,
+      });
+      const errorMessage =
+        err.response?.status === 403
+          ? 'Unauthorized: You are not the instructor of this course'
+          : err.response?.status === 404
+          ? 'Session not found'
+          : err.response?.status === 500
+          ? 'Server error: Failed to delete session. Please try again later.'
+          : err.response?.data?.error || 'Failed to delete session';
+      setError(errorMessage);
     }
   };
 
   const handleDeleteCourse = async () => {
     try {
-      const confirmDelete = window.confirm('Are you sure you want to delete this course?');
+      const confirmDelete = window.confirm('Are you sure you want to delete this course? This action cannot be undone.');
       if (!confirmDelete) return;
 
-      await axios.delete(`${API_URL}/courses/${courseId}`, {
-        withCredentials: true,
-      });
-
-      alert('Course deleted successfully');
+      const response = await axiosAuth.delete(`/courses/${courseId}`);
+      alert(response.data.message || 'Course deleted successfully');
       navigate('/dashboard');
     } catch (err) {
-      alert('Error deleting course');
+      console.error('Error deleting course:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.response?.config?.url,
+      });
+      const errorMessage =
+        err.response?.status === 403
+          ? 'Unauthorized: You are not the instructor of this course'
+          : err.response?.status === 404
+          ? 'Course not found'
+          : err.response?.status === 500
+          ? 'Server error: Failed to delete course. Please try again later.'
+          : err.response?.data?.error || 'Failed to delete course';
+      setError(errorMessage);
     }
   };
 
@@ -147,9 +177,7 @@ export default function CourseManage() {
       const confirmUnenroll = window.confirm('Are you sure you want to unenroll this student?');
       if (!confirmUnenroll) return;
 
-      await axios.delete(`${API_URL}/enrollments/${enrollmentId}`, {
-        withCredentials: true,
-      });
+      const response = await axiosAuth.delete(`/enrollments/${enrollmentId}`);
       setEnrollments(enrollments.filter((e) => e.id !== enrollmentId));
       setProgressData((prev) => {
         const newProgress = { ...prev };
@@ -157,9 +185,20 @@ export default function CourseManage() {
         return newProgress;
       });
       setCurrentPage(1);
-      alert('Student unenrolled successfully');
+      alert(response.data.message || 'Student unenrolled successfully');
     } catch (err) {
-      alert('Error unenrolling student');
+      console.error('Error unenrolling student:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+      });
+      const errorMessage =
+        err.response?.status === 403
+          ? 'Unauthorized: You cannot unenroll this student'
+          : err.response?.status === 404
+          ? 'Enrollment not found'
+          : err.response?.data?.error || 'Failed to unenroll student';
+      setError(errorMessage);
     }
   };
 
@@ -175,10 +214,16 @@ export default function CourseManage() {
 
   return (
     <ErrorBoundary>
-      <div className="max-w-5xl mx-auto p-6">
-        {error && <p className="text-red-500 text-center p-4 mb-4 rounded-md bg-red-50">{error}</p>}
+      <div className="max-w-5xl mx-auto p-6 bg-gray-50 dark:bg-gray-800 min-h-screen">
+        {error && (
+          <p className="text-red-500 text-center p-4 mb-4 rounded-md bg-red-100 dark:bg-red-800/30 dark:text-red-200">
+            {error}
+          </p>
+        )}
 
-        {!course && !error && <p className="text-gray-600 text-center p-4">Loading...</p>}
+        {!course && !error && (
+          <p className="text-gray-600 dark:text-gray-200 text-center p-4">Loading...</p>
+        )}
 
         {course && (
           <>
@@ -205,7 +250,7 @@ export default function CourseManage() {
               setCurrentPage={setCurrentPage}
               handleUnenrollStudent={handleUnenrollStudent}
             />
-            <ReviewSection courseId={courseId} user={user} token={user.token} />
+            <ReviewSection courseId={courseId} user={user} />
           </>
         )}
       </div>

@@ -7,7 +7,6 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 
-// Import ProseMirror styles
 import '@tiptap/extension-text-style';
 import 'prosemirror-view/style/prosemirror.css';
 
@@ -28,41 +27,32 @@ export default function SessionForm() {
 
   const fetchSessionData = async () => {
     if (!sessionId) return;
-
     try {
-      const response = await axios.get(
-        `${API_URL}/courses/${courseId}/sessions/${sessionId}`,
-        {
-          withCredentials: true,
-
-        }
-      );
-      const sessionData = response.data.data;
-      setTitle(sessionData.title);
-      setYoutubeLink(sessionData.youtubeLink);
-      setExplanation(sessionData.explanation);
+      const response = await axios.get(`${API_URL}/courses/${courseId}/sessions/${sessionId}`, {
+        withCredentials: true,
+      });
+      const data = response.data.data;
+      setTitle(data.title);
+      setYoutubeLink(data.youtubeLink);
+      setExplanation(data.explanation);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch session data');
     }
   };
 
   useEffect(() => {
-    if (isEditMode) {
-      fetchSessionData();
-    }
-  }, [isEditMode, courseId, sessionId]);
+    if (isEditMode) fetchSessionData();
+  }, [isEditMode]);
 
   useEffect(() => {
     if (youtubeLink) {
-      const videoId = extractVideoIdFromUrl(youtubeLink);
-      if (videoId) {
-        setThumbnailUrl(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
-      }
+      const id = extractVideoIdFromUrl(youtubeLink);
+      if (id) setThumbnailUrl(`https://img.youtube.com/vi/${id}/hqdefault.jpg`);
     }
   }, [youtubeLink]);
 
   const extractVideoIdFromUrl = (url) => {
-    const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const regex = /(?:youtube\.com\/(?:[^/]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     return url.match(regex) ? url.match(regex)[1] : null;
   };
 
@@ -70,9 +60,7 @@ export default function SessionForm() {
     extensions: [
       StarterKit,
       Underline,
-      Link.configure({
-        openOnClick: false,
-      }),
+      Link.configure({ openOnClick: false }),
     ],
     content: explanation,
     onUpdate: ({ editor }) => {
@@ -80,7 +68,6 @@ export default function SessionForm() {
     },
   });
 
-  // Sync editor content when explanation changes (e.g., during edit mode)
   useEffect(() => {
     if (editor && explanation !== editor.getHTML()) {
       editor.commands.setContent(explanation);
@@ -91,36 +78,18 @@ export default function SessionForm() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    const payload = { title, youtubeLink, explanation };
 
     try {
-      const payload = {
-        title,
-        youtubeLink,
-        explanation,
-      };
-
-      let response;
-
       if (isEditMode) {
-        response = await axios.put(
-          `${API_URL}/courses/${courseId}/sessions/${sessionId}`,
-          payload,
-          {
-            withCredentials: true,
-            
-          }
-        );
+        await axios.put(`${API_URL}/courses/${courseId}/sessions/${sessionId}`, payload, {
+          withCredentials: true,
+        });
       } else {
-        response = await axios.post(
-          `${API_URL}/courses/${courseId}/sessions`,
-          payload,
-          {
-            withCredentials: true,
-
-          }
-        );
+        await axios.post(`${API_URL}/courses/${courseId}/sessions`, payload, {
+          withCredentials: true,
+        });
       }
-
       navigate(`/courses/${courseId}/manage`);
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong');
@@ -129,144 +98,85 @@ export default function SessionForm() {
     }
   };
 
-  if (!editor) {
-    return null; // Prevent rendering until editor is initialized
-  }
+  if (!editor) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-6 rounded-md shadow-md w-full max-w-lg">
-        <h2 className="text-2xl font-bold mb-4">{isEditMode ? 'Edit Session' : 'Create Session'}</h2>
+    <div className="min-h-screen py-12 px-4 bg-gray-50">
+      <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-8">
+        <h1 className="text-3xl font-semibold mb-6 text-gray-800">
+          {isEditMode ? 'Edit Session' : 'Create New Session'}
+        </h1>
 
-        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {error && <p className="text-red-600 mb-4">{error}</p>}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block font-medium mb-1">Title</label>
+            <label className="block text-gray-700 font-medium mb-2">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border px-3 py-2 rounded-md"
+              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="block font-medium mb-1">YouTube Link</label>
+            <label className="block text-gray-700 font-medium mb-2">YouTube Link</label>
             <input
               type="text"
               value={youtubeLink}
               onChange={(e) => setYoutubeLink(e.target.value)}
-              className="w-full border px-3 py-2 rounded-md"
+              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           {thumbnailUrl && (
-            <div className="mb-4">
-              <label className="block font-medium mb-1">Video Thumbnail</label>
-              <img
-                src={thumbnailUrl}
-                alt="YouTube Video Thumbnail"
-                className="w-full h-auto rounded-md"
-              />
+            <div>
+              <label className="block text-gray-700 font-medium mb-2">Video Thumbnail</label>
+              <img src={thumbnailUrl} alt="Thumbnail" className="rounded-md w-full h-auto" />
             </div>
           )}
 
           <div>
-            <label className="block font-medium mb-1">Explanation</label>
+            <label className="block text-gray-700 font-medium mb-2">Explanation</label>
 
-            <div className="flex gap-2 mb-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleBold().run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('bold') ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                Bold
-              </button>
-
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleItalic().run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('italic') ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                Italic
-              </button>
-
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleUnderline().run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('underline') ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                Underline
-              </button>
-
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('heading', { level: 1 }) ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                H1
-              </button>
-
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('heading', { level: 2 }) ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                H2
-              </button>
-
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleBulletList().run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('bulletList') ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                Bullet List
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const url = prompt('Enter the URL');
-                  if (url) {
-                    editor.chain().focus().setLink({ href: url }).run();
-                  } else {
-                    editor.chain().focus().unsetLink().run();
-                  }
-                }}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('link') ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                Link
-              </button>
-
-              <button
-                type="button"
-                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                className={`px-3 py-1 border rounded-md ${
-                  editor.isActive('codeBlock') ? 'bg-blue-500 text-white' : 'bg-gray-100'
-                }`}
-              >
-                Code Block
-              </button>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {[
+                { label: 'Bold', action: () => editor.chain().focus().toggleBold().run(), isActive: editor.isActive('bold') },
+                { label: 'Italic', action: () => editor.chain().focus().toggleItalic().run(), isActive: editor.isActive('italic') },
+                { label: 'Underline', action: () => editor.chain().focus().toggleUnderline().run(), isActive: editor.isActive('underline') },
+                { label: 'H1', action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), isActive: editor.isActive('heading', { level: 1 }) },
+                { label: 'H2', action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), isActive: editor.isActive('heading', { level: 2 }) },
+                { label: 'List', action: () => editor.chain().focus().toggleBulletList().run(), isActive: editor.isActive('bulletList') },
+                { label: 'Code', action: () => editor.chain().focus().toggleCodeBlock().run(), isActive: editor.isActive('codeBlock') },
+                {
+                  label: 'Link',
+                  action: () => {
+                    const url = prompt('Enter URL');
+                    if (url) editor.chain().focus().setLink({ href: url }).run();
+                    else editor.chain().focus().unsetLink().run();
+                  },
+                  isActive: editor.isActive('link'),
+                },
+              ].map(({ label, action, isActive }) => (
+                <button
+                  type="button"
+                  key={label}
+                  onClick={action}
+                  className={`px-3 py-1 text-sm rounded-md border ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="border rounded-md p-2 min-h-[150px] prose">
+            <div className="border border-gray-300 rounded-md p-3 min-h-[150px] prose max-w-none bg-white">
               <EditorContent editor={editor} />
             </div>
           </div>
@@ -274,7 +184,7 @@ export default function SessionForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+            className="w-full py-2 px-4 rounded-md text-white font-medium bg-blue-600 hover:bg-blue-700 transition"
           >
             {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Session' : 'Create Session')}
           </button>
