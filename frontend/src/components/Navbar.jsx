@@ -7,16 +7,12 @@ const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-  const toggleMenu = () => setMenuOpen(prev => !prev);
+  const toggleMenu = () => setMenuOpen((prev) => !prev);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  // Extract actual user details from wrapped object
-  const actualUser = user?.user;
-  const token = user?.token;
 
   return (
     <nav className="bg-blue-600 text-white p-4">
@@ -24,14 +20,14 @@ const Navbar = () => {
         <Link to="/" className="font-bold text-xl">LearnSphere</Link>
 
         <div className="flex items-center gap-4">
-          {!actualUser ? (
+          {!user ? (
             <>
               <Link to="/login" className="hover:underline">Login</Link>
               <Link to="/register" className="hover:underline">Register</Link>
             </>
           ) : (
             <>
-              {actualUser.role === 'Student' && (
+              {user.role === 'Student' && (
                 <>
                   <Link to="/studentdashboard" className="hover:underline">All Courses</Link>
                   <Link to="/enrolled-courses" className="hover:underline">Enrolled Courses</Link>
@@ -39,8 +35,11 @@ const Navbar = () => {
                 </>
               )}
 
-              {actualUser.role === 'Instructor' && (
-                <Link to="/my-courses" className="hover:underline">My Courses</Link>
+              {user.role === 'Instructor' && (
+                <>
+                <Link to="/dashboard" className="hover:underline">Manage Courses</Link>
+                <Link to="/statastics" className="hover:underline">Dashboard</Link>
+                </>
               )}
 
               {/* Profile Dropdown */}
@@ -49,7 +48,7 @@ const Navbar = () => {
                   onClick={toggleMenu}
                   className="flex items-center gap-2 bg-blue-700 px-3 py-1 rounded hover:bg-blue-800"
                 >
-                  {actualUser.name} ▼
+                  {user.name} ▼
                 </button>
 
                 {menuOpen && (

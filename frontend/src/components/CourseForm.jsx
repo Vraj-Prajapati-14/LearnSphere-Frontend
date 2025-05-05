@@ -20,7 +20,7 @@ export default function CourseForm() {
         const [categoryRes, courseRes] = await Promise.all([
           axios.get(`${API_URL}/category`, {
             headers: { Authorization: `Bearer ${user.token}` },
-          }),
+          }), 
           courseId
             ? axios.get(`${API_URL}/courses/${courseId}`, {
                 headers: { Authorization: `Bearer ${user.token}` },

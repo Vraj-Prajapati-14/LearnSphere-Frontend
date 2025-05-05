@@ -14,14 +14,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (authLoading) return;
 
-    // Redirect if not logged in
     if (!user) {
       navigate('/login');
       return;
     }
 
     // Redirect if user is not an Instructor
-    if (user.user.role !== 'Instructor') {
+    if (user.role !== 'Instructor') {
       navigate('/login'); // or navigate('/unauthorized')
       return;
     }
@@ -29,7 +28,7 @@ export default function Dashboard() {
     const loadInstructorCourses = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/courses?instructorId=${user.user.id}`, {
+        const response = await axios.get(`${API_URL}/courses?instructorId=${user.id}`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
 
@@ -64,7 +63,7 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">
-            Welcome, {user.user.name} (Instructor)
+            Welcome, {user.name} (Instructor)
           </h1>
           <button
             onClick={handleLogout}

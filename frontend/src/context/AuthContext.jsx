@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
 const AuthContext = createContext();
 
@@ -10,21 +11,20 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('token');
+      const storedUser = Cookies.get('user');
+      const storedToken = Cookies.get('token');
 
       if (storedUser && storedToken) {
         try {
-          // Validate token, don't override user unless needed
+          const userData = JSON.parse(storedUser);
           await axios.get(`${API_URL}/auth/validate`, {
             headers: { Authorization: `Bearer ${storedToken}` },
           });
-
-          setUser({ user: JSON.parse(storedUser), token: storedToken });
+          setUser({ ...userData, token: storedToken });
         } catch (error) {
-          console.error('Token validation failed:', error);
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
+          console.error('Token validation failed:', error.response?.data || error.message);
+          Cookies.remove('user');
+          Cookies.remove('token');
           setUser(null);
         }
       }
@@ -35,15 +35,16 @@ export const AuthProvider = ({ children }) => {
   }, [API_URL]);
 
   const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData.user));
-    localStorage.setItem('token', userData.token);
+    const { id, email, role, name, token } = userData; // Destructure to match backend response
+    setUser({ id, email, role, name, token });
+    Cookies.set('user', JSON.stringify({ id, email, role, name }), { expires: 7 });
+    Cookies.set('token', token, { expires: 7 });
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    Cookies.remove('user');
+    Cookies.remove('token');
   };
 
   return (

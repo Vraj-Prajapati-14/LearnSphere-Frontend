@@ -62,7 +62,7 @@ const LandingPage = () => {
             Explore a variety of courses, enroll, and learn with experts from various fields.
           </p>
           <Link
-            to="/signup"
+            to="/register"
             className="inline-block bg-white text-blue-600 font-semibold py-3 px-6 rounded-lg shadow hover:bg-gray-200 transition duration-300"
           >
             Join Today
@@ -108,11 +108,11 @@ const LandingPage = () => {
                 key={course.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition duration-300"
               >
-                <img
+                {/* <img
                   src={course.image || 'https://via.placeholder.com/300x200'}
                   alt={course.title}
                   className="w-full h-48 object-cover"
-                />
+                /> */}
                 <div className="p-4">
                   <h3 className="text-xl font-semibold mb-2">{course.title}</h3>
                   <p className="text-gray-600 mb-4 line-clamp-3">{course.description}</p>

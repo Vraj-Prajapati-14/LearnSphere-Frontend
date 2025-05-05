@@ -12,6 +12,7 @@ import EnrolledCourses from './components/EnrolledCourses.jsx';
 import CourseProgress from './components/CourseProgress.jsx';
 // import CourseCard from './components/CourseCard.jsx';
 import CourseDetails from './components/CourseDetails.jsx';
+import InstructorStatistics from './components/InstructorStatistics.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -35,11 +36,20 @@ function App() {
         <Route path="/courses/:id" element={<CourseDetails/>} />
         <Route path="/login" element={<AuthForm isRegister={false} />} />
         <Route path="/register" element={<AuthForm isRegister={true} />} />
+        <Route path="/auth/google/callback" element={<AuthForm isRegister={false} />} />
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+         <Route
+          path="/statastics"
+          element={
+            <ProtectedRoute>
+              <InstructorStatistics />
             </ProtectedRoute>
           }
         />
