@@ -11,82 +11,91 @@ export default function ReviewSection({ courseId, user, token }) {
   const [hasReviewed, setHasReviewed] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
 
+  useEffect(() => {
+    if (user) {
+      fetchReviews();
+    }
+  }, [user, courseId]);
+  
   const fetchReviews = async () => {
     try {
       const response = await axios.get(`${API_URL}/reviews/course/${courseId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
+      console.log('fetchReviews - Response:', response.data);
       const fetchedReviews = response.data.data || [];
       setReviews(fetchedReviews);
       const userReview = fetchedReviews.find((review) => review.userId === user.id);
       setHasReviewed(!!userReview);
     } catch (err) {
-      console.error('Failed to fetch reviews:', err.response ? err.response.data : err.message);
-      setError('Failed to load reviews');
+      console.error('fetchReviews - Failed:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      setError(err.response?.data?.error || 'Failed to load reviews');
     }
   };
-
+  
   const handleReviewSubmit = async () => {
     if (hasReviewed) {
       alert('You have already reviewed this course.');
       return;
     }
-
+  
     if (!rating || rating < 1 || rating > 5) {
       setError('Please provide a rating between 1 and 5 stars.');
       return;
     }
-
+  
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}/reviews/${courseId}`,
         { rating: Number(rating), text: reviewText },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { withCredentials: true }
       );
+      console.log('handleReviewSubmit - Response:', response.data);
       setReviewText('');
       setRating(0);
       setHasReviewed(true);
       fetchReviews();
       setError(null);
     } catch (err) {
-      console.error('Error submitting review:', err.response ? err.response.data : err.message);
+      console.error('handleReviewSubmit - Failed:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
       setError(err.response?.data?.error || 'Failed to add review');
     }
   };
-
+  
   const handleCommentSubmit = async (reviewId) => {
     if (!newComment[reviewId] || !newComment[reviewId].trim()) {
       alert('Comment cannot be empty');
       return;
     }
-
+  
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}/reviews/comment/${reviewId}`,
         { text: newComment[reviewId] },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { withCredentials: true }
       );
+      console.log('handleCommentSubmit - Response:', response.data);
       setNewComment((prev) => ({ ...prev, [reviewId]: '' }));
       setIsCommenting((prev) => ({ ...prev, [reviewId]: false }));
-      fetchReviews(); // Refresh reviews to include the new comment
+      fetchReviews();
       alert('Comment added successfully');
     } catch (err) {
+      console.error('handleCommentSubmit - Failed:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
       alert('Error adding comment: ' + (err.response?.data?.error || 'Please try again'));
     }
   };
-
-  const toggleCommentInput = (reviewId) => {
-    setIsCommenting((prev) => ({ ...prev, [reviewId]: !prev[reviewId] }));
-    if (!isCommenting[reviewId]) {
-      setNewComment((prev) => ({ ...prev, [reviewId]: '' }));
-    }
-  };
-
-  useEffect(() => {
-    if (user && token) {
-      fetchReviews();
-    }
-  }, [user, token, courseId]);
 
   const renderStars = (rating) => {
     const stars = [];

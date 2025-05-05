@@ -29,11 +29,13 @@ export default function Dashboard() {
       try {
         setLoading(true);
         const response = await axios.get(`${API_URL}/courses?instructorId=${user.id}`, {
-          headers: { Authorization: `Bearer ${user.token}` },
+          withCredentials: true, // Send httpOnly token cookie
         });
 
+        console.log('Courses response:', response.data);
         setCourses(response.data.data || []);
       } catch (err) {
+        console.error('Courses fetch error:', err.response?.data || err.message);
         setError(err.response?.data?.error || 'Failed to fetch courses');
       } finally {
         setLoading(false);

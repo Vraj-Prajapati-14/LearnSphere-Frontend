@@ -18,8 +18,9 @@ export default function StudentDashboard() {
     const fetchCourses = async () => {
       try {
         setLoading(true);
-        const headers = user ? { Authorization: `Bearer ${user.token}` } : {};
-        const response = await axios.get(`${API_URL}/courses`, { headers });
+        const headers = user ?    { withCredentials: true }  : {};
+        const response = await axios.get(`${API_URL}/courses`,    {withCredentials: true}
+        );
         console.log(response.data);
         setCourses(response.data.data || []);
       } catch (err) {
@@ -38,7 +39,8 @@ export default function StudentDashboard() {
       const fetchSessions = async () => {
         try {
           const response = await axios.get(`${API_URL}/courses/${selectedCourseId}/sessions`, {
-            headers: { Authorization: `Bearer ${user.token}` },
+            withCredentials: true,
+
           });
           setSessions(response.data.data || []);
         } catch (err) {
@@ -61,7 +63,8 @@ export default function StudentDashboard() {
         `${API_URL}/enrollments`,
         { courseId },
         {
-          headers: { Authorization: `Bearer ${user.token}` },
+          withCredentials: true,
+
         }
       );
       alert('Enrolled successfully!');

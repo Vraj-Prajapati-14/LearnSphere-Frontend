@@ -1,3 +1,4 @@
+// In AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
@@ -9,46 +10,134 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const API_URL = import.meta.env.VITE_API_URL;
 
+  // Axios instance with base config
+  const axiosAuth = axios.create({
+    baseURL: API_URL,
+    withCredentials: true,
+  });
+
+  // Store ongoing refresh promise
+  let isRefreshing = false;
+  let refreshSubscribers = [];
+
+  const subscribeTokenRefresh = (cb) => {
+    refreshSubscribers.push(cb);
+  };
+
+  const onTokenRefreshed = (err, newToken) => {
+    refreshSubscribers.forEach((cb) => cb(err, newToken));
+    refreshSubscribers = [];
+  };
+
+  // Attach refresh-token logic to interceptor
+  useEffect(() => {
+    const interceptor = axiosAuth.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          !originalRequest.url.includes('/auth/refresh-token')
+        ) {
+          originalRequest._retry = true;
+
+          if (isRefreshing) {
+            // Queue the request until refresh completes
+            return new Promise((resolve, reject) => {
+              subscribeTokenRefresh((err, token) => {
+                if (err) return reject(err);
+                resolve(axiosAuth(originalRequest));
+              });
+            });
+          }
+
+          isRefreshing = true;
+
+          try {
+            console.log('🔄 Interceptor: refreshing token...');
+            const response = await axiosAuth.post('/auth/refresh-token');
+            console.log('🔄 Refresh successful:', response.data);
+            isRefreshing = false;
+            onTokenRefreshed(null, response.data);
+            return axiosAuth(originalRequest);
+          } catch (refreshError) {
+            console.error('🔴 Interceptor refresh failed:', {
+              status: refreshError.response?.status,
+              data: refreshError.response?.data,
+              message: refreshError.message,
+            });
+            isRefreshing = false;
+            onTokenRefreshed(refreshError, null);
+            if (refreshError.response?.status === 403 || refreshError.response?.status === 401) {
+              console.log('Invalid or expired refresh token, logging out');
+              logout();
+              window.location.href = '/login';
+            }
+            return Promise.reject(refreshError);
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axiosAuth.interceptors.response.eject(interceptor);
+    };
+  }, []);
+
+  // Initial auth check
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedUser = Cookies.get('user');
-      const storedToken = Cookies.get('token');
-
-      if (storedUser && storedToken) {
-        try {
-          const userData = JSON.parse(storedUser);
-          await axios.get(`${API_URL}/auth/validate`, {
-            headers: { Authorization: `Bearer ${storedToken}` },
+      try {
+        const storedUser = Cookies.get('user');
+        if (storedUser) {
+          const response = await axiosAuth.get('/auth/validate');
+          const { user: validatedUser } = response.data.data;
+          const cleanUser = {
+            id: validatedUser.id,
+            email: validatedUser.email,
+            role: validatedUser.role,
+            name: validatedUser.name,
+          };
+          setUser(cleanUser);
+          Cookies.set('user', JSON.stringify(cleanUser), {
+            expires: 7,
+            secure: import.meta.env.PROD,
+            sameSite: 'Strict',
           });
-          setUser({ ...userData, token: storedToken });
-        } catch (error) {
-          console.error('Token validation failed:', error.response?.data || error.message);
-          Cookies.remove('user');
-          Cookies.remove('token');
-          setUser(null);
         }
+      } catch (err) {
+        console.error('❌ Validation failed:', err);
+        logout();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initializeAuth();
-  }, [API_URL]);
+  }, []);
 
   const login = (userData) => {
-    const { id, email, role, name, token } = userData; // Destructure to match backend response
-    setUser({ id, email, role, name, token });
-    Cookies.set('user', JSON.stringify({ id, email, role, name }), { expires: 7 });
-    Cookies.set('token', token, { expires: 7 });
+    const { id, email, role, name } = userData;
+    const cleanUser = { id, email, role, name };
+    setUser(cleanUser);
+    Cookies.set('user', JSON.stringify(cleanUser), {
+      expires: 7,
+      secure: import.meta.env.PROD,
+      sameSite: 'Strict',
+    });
   };
 
   const logout = () => {
     setUser(null);
     Cookies.remove('user');
-    Cookies.remove('token');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, axiosAuth }}>
       {children}
     </AuthContext.Provider>
   );

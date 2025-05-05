@@ -12,38 +12,28 @@ export default function AuthForm({ isRegister }) {
   const location = useLocation();
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // Handle Google Sign-In callback
   useEffect(() => {
     if (location.pathname === '/auth/google/callback') {
-      const params = new URLSearchParams(location.search);
-      const token = params.get('token');
-      const role = params.get('role');
-
-      if (token && role) {
-        axios
-          .get(`${API_URL}/auth/validate`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          .then((response) => {
-            const userData = response.data.data.user;
-            login({ ...userData, token, role });
-            if (role === 'Student') {
-              navigate('/studentdashboard');
-            } else if (role === 'Instructor') {
-              navigate('/dashboard');
-            } else {
-              navigate('/dashboard');
-            }
-          })
-          .catch((error) => {
-            console.error('Google Sign-In validation failed:', error.response?.data || error.message);
-            setApiError('Failed to authenticate with Google');
-            navigate('/login');
-          });
-      } else {
-        setApiError('Google authentication failed');
-        navigate('/login');
-      }
+      axios
+        .get(`${API_URL}/auth/validate`, {
+          withCredentials: true,
+        })
+        .then((response) => {
+          const userData = response.data.data.user;
+          login({ ...userData });
+          if (userData.role === 'Student') {
+            navigate('/studentdashboard');
+          } else if (userData.role === 'Instructor') {
+            navigate('/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
+        })
+        .catch((error) => {
+          console.error('Google Sign-In validation failed:', error.response?.data || error.message);
+          setApiError('Failed to authenticate with Google');
+          navigate('/login');
+        });
     }
   }, [location, login, navigate, API_URL]);
 
@@ -65,10 +55,13 @@ export default function AuthForm({ isRegister }) {
             email: data.email,
             password: data.password,
           },
-          { headers: { 'Content-Type': 'application/json' } }
+          {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true,
+          }
         );
-        const { user, token } = response.data.data; // { user: { id, email, role, name }, token }
-        login({ ...user, token });
+        const user = response.data.data.user;
+        login({ ...user });
         if (user.role === 'Student') {
           navigate('/studentdashboard');
         } else if (user.role === 'Instructor') {

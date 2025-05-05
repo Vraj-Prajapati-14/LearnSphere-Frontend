@@ -30,7 +30,7 @@ class ErrorBoundary extends Component {
 
 export default function CourseManage() {
   const { courseId } = useParams();
-  const { user } = useAuth();
+  const { user ,loading } = useAuth();
   const [course, setCourse] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
@@ -47,18 +47,18 @@ export default function CourseManage() {
   const fetchCourseData = async () => {
     try {
       const { data: courseData } = await axios.get(`${API_URL}/courses/${courseId}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       setCourse(courseData.data);
 
       const sessionsRes = await axios.get(`${API_URL}/courses/${courseId}/sessions`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       setSessions(Array.isArray(sessionsRes.data.data) ? sessionsRes.data.data : []);
 
       const enrollmentsRes = await axios.get(`${API_URL}/enrollments`, {
         params: { courseId },
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       const enrollmentData = enrollmentsRes.data.data;
       if (Array.isArray(enrollmentData)) {
@@ -72,7 +72,7 @@ export default function CourseManage() {
       }
 
       const progressRes = await axios.get(`${API_URL}/progress/course/${courseId}/progress`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       const progressDataResult = progressRes.data.data;
       if (Array.isArray(progressDataResult)) {
@@ -106,17 +106,18 @@ export default function CourseManage() {
   };
 
   useEffect(() => {
+    if (loading) return; // wait for auth to load
     if (user && user.token) {
       fetchCourseData();
     } else {
       setError('Please log in to manage courses');
     }
-  }, [courseId, user]);
+  }, [courseId, user, loading]);
 
   const handleDeleteSession = async (sessionId) => {
     try {
       await axios.delete(`${API_URL}/courses/${courseId}/sessions/${sessionId}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       setSessions(sessions.filter((s) => s.id !== sessionId));
       alert('Session deleted successfully');
@@ -131,7 +132,7 @@ export default function CourseManage() {
       if (!confirmDelete) return;
 
       await axios.delete(`${API_URL}/courses/${courseId}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
 
       alert('Course deleted successfully');
@@ -147,7 +148,7 @@ export default function CourseManage() {
       if (!confirmUnenroll) return;
 
       await axios.delete(`${API_URL}/enrollments/${enrollmentId}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       setEnrollments(enrollments.filter((e) => e.id !== enrollmentId));
       setProgressData((prev) => {

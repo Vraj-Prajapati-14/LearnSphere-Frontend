@@ -17,7 +17,7 @@ export default function CourseProgress() {
   const fetchCourseProgress = async () => {
     try {
       const response = await axios.get(`${API_URL}/progress/course/${courseId}/progress`, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       const { progress = [], sessions = [], overallProgress = 0 } = response.data.data;
       const sessionsWithProgress = sessions.map((session) => ({
@@ -39,7 +39,7 @@ export default function CourseProgress() {
       await axios.post(
         `${API_URL}/progress`,
         { sessionId, isCompleted: true },
-        { headers: { Authorization: `Bearer ${user.token}` } }
+        {   withCredentials: true, }
       );
       fetchCourseProgress();
     } catch (err) {

@@ -15,9 +15,7 @@ export default function EnrolledCourses() {
     setLoading(true);
     try {
       const response = await axios.get(`${API_URL}/enrollments`, {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
+        withCredentials: true,
       });
 
       // Only course data, no session/progress fetching

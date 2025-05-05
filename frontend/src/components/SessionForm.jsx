@@ -33,9 +33,8 @@ export default function SessionForm() {
       const response = await axios.get(
         `${API_URL}/courses/${courseId}/sessions/${sessionId}`,
         {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
+          withCredentials: true,
+
         }
       );
       const sessionData = response.data.data;
@@ -107,9 +106,8 @@ export default function SessionForm() {
           `${API_URL}/courses/${courseId}/sessions/${sessionId}`,
           payload,
           {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
+            withCredentials: true,
+            
           }
         );
       } else {
@@ -117,9 +115,8 @@ export default function SessionForm() {
           `${API_URL}/courses/${courseId}/sessions`,
           payload,
           {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
+            withCredentials: true,
+
           }
         );
       }

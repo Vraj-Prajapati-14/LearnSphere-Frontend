@@ -19,11 +19,11 @@ export default function CourseForm() {
       try {
         const [categoryRes, courseRes] = await Promise.all([
           axios.get(`${API_URL}/category`, {
-            headers: { Authorization: `Bearer ${user.token}` },
+            withCredentials: true,
           }), 
           courseId
             ? axios.get(`${API_URL}/courses/${courseId}`, {
-                headers: { Authorization: `Bearer ${user.token}` },
+              withCredentials: true,
               })
             : Promise.resolve(null),
         ]);
@@ -63,12 +63,12 @@ const onSubmit = async (formData) => {
 
     if (courseId) {
       await axios.put(`${API_URL}/courses/${courseId}`, formData, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       navigate(`/courses/${courseId}/manage`);
     } else {
       await axios.post(`${API_URL}/courses`, formData, {
-        headers: { Authorization: `Bearer ${user.token}` },
+        withCredentials: true,
       });
       navigate(`/dashboard`);
     }
