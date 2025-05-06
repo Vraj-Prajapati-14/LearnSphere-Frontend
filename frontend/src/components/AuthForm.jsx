@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import VisibleRecaptcha from './VisibleRecaptcha.jsx';
 
 export default function AuthForm({ isRegister }) {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const [apiError, setApiError] = useState(null);
+  const [recaptchaToken, setRecaptchaToken] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,6 +40,12 @@ export default function AuthForm({ isRegister }) {
   }, [location, login, navigate, API_URL]);
 
   const onSubmit = async (data) => {
+    console.log(recaptchaToken);
+    
+    if (!recaptchaToken) {
+      setApiError('Please verify the CAPTCHA');
+      return;
+    }
     try {
       setApiError(null);
       if (isRegister) {
@@ -46,6 +54,7 @@ export default function AuthForm({ isRegister }) {
           email: data.email,
           password: data.password,
           role: data.role || 'Student',
+          captchaToken: recaptchaToken,
         });
         navigate('/login');
       } else {
@@ -54,6 +63,7 @@ export default function AuthForm({ isRegister }) {
           {
             email: data.email,
             password: data.password,
+            captchaToken: recaptchaToken,
           },
           {
             headers: { 'Content-Type': 'application/json' },
@@ -153,7 +163,7 @@ export default function AuthForm({ isRegister }) {
         )}
 
         {apiError && <p className="mb-4 text-sm text-red-500 text-center">{apiError}</p>}
-
+        <VisibleRecaptcha onChange={(token) => setRecaptchaToken(token)} />
         <button
           type="submit"
           className="w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition"

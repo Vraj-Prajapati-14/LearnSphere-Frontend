@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL;
 
   const axiosAuth = axios.create({
@@ -28,7 +30,6 @@ export const AuthProvider = ({ children }) => {
 
   const updateUserToken = (token, userData) => {
     const updatedUser = { ...userData, token };
-    console.log('Updating user state:', updatedUser);
     setUser(updatedUser);
     Cookies.set('user', JSON.stringify(updatedUser), {
       expires: 7,
@@ -66,9 +67,9 @@ export const AuthProvider = ({ children }) => {
 
           isRefreshing = true;
           try {
-            console.log('🔄 Interceptor: refreshing token...');
-            const response = await axiosAuth.post('/auth/refresh-token');
-            console.log('🔄 Refresh response:', response.data);
+            const response = await axiosAuth.post('/auth/refresh-token', {}, {
+              withCredentials: true,
+            });
             const { user: refreshedUser, token } = response.data.data;
             updateUserToken(token, refreshedUser);
             originalRequest.headers['Authorization'] = `Bearer ${token}`;
@@ -76,14 +77,10 @@ export const AuthProvider = ({ children }) => {
             onTokenRefreshed(null, token);
             return axiosAuth(originalRequest);
           } catch (refreshError) {
-            console.error('🔴 Interceptor refresh failed:', {
-              status: refreshError.response?.status,
-              data: refreshError.response?.data,
-              message: refreshError.message,
-            });
             isRefreshing = false;
             onTokenRefreshed(refreshError, null);
             logout();
+            navigate('/login');
             return Promise.reject(refreshError);
           }
         }
@@ -100,23 +97,23 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       try {
         const storedUserRaw = Cookies.get('user');
-        console.log('Raw user cookie:', storedUserRaw);
         let storedUser = null;
         if (storedUserRaw) {
           try {
             storedUser = JSON.parse(storedUserRaw);
-            console.log('Parsed user cookie:', storedUser);
           } catch (parseError) {
-            console.error('❌ Failed to parse user cookie:', parseError);
             Cookies.remove('user');
             Cookies.remove('token');
+            Cookies.remove('refreshToken');
           }
         }
 
         if (storedUser) {
           try {
-            const response = await axiosAuth.get('/auth/validate');
-            console.log('🔍 Validate response:', response.data);
+            const response = await axiosAuth.get('/auth/validate', {
+              headers: { Authorization: `Bearer ${storedUser.token}` },
+              withCredentials: true,
+            });
             const { user: validatedUser, token } = response.data.data;
             const cleanUser = {
               id: validatedUser.id,
@@ -125,7 +122,6 @@ export const AuthProvider = ({ children }) => {
               name: validatedUser.name,
               token,
             };
-            console.log('Setting user from validate:', cleanUser);
             setUser(cleanUser);
             Cookies.set('user', JSON.stringify(cleanUser), {
               expires: 7,
@@ -138,12 +134,11 @@ export const AuthProvider = ({ children }) => {
               sameSite: 'Strict',
             });
           } catch (validateError) {
-            console.error('❌ Validation failed:', validateError);
             if (validateError.response?.status === 401) {
-              console.log('🔄 Attempting token refresh...');
               try {
-                const response = await axiosAuth.post('/auth/refresh-token');
-                console.log('🔄 Refresh response:', response.data);
+                const response = await axiosAuth.post('/auth/refresh-token', {}, {
+                  withCredentials: true,
+                });
                 const { user: refreshedUser, token } = response.data.data;
                 const cleanUser = {
                   id: refreshedUser.id,
@@ -152,7 +147,6 @@ export const AuthProvider = ({ children }) => {
                   name: refreshedUser.name,
                   token,
                 };
-                console.log('Setting user from refresh:', cleanUser);
                 setUser(cleanUser);
                 Cookies.set('user', JSON.stringify(cleanUser), {
                   expires: 7,
@@ -165,17 +159,18 @@ export const AuthProvider = ({ children }) => {
                   sameSite: 'Strict',
                 });
               } catch (refreshError) {
-                console.error('❌ Refresh failed:', refreshError);
                 logout();
+                navigate('/login');
               }
             } else {
               logout();
+              navigate('/login');
             }
           }
         }
       } catch (err) {
-        console.error('❌ Initialization error:', err);
         logout();
+        navigate('/login');
       } finally {
         setLoading(false);
       }
@@ -186,7 +181,6 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData, token) => {
     const cleanUser = { ...userData, token };
-    console.log('Logging in user:', cleanUser);
     setUser(cleanUser);
     Cookies.set('user', JSON.stringify(cleanUser), {
       expires: 7,
@@ -200,12 +194,17 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  const logout = () => {
-    console.log('Logging out, clearing user state and cookies');
+  const logout = async () => {
+    try {
+      await axiosAuth.post('/auth/logout', {}, { withCredentials: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     setUser(null);
     Cookies.remove('user');
     Cookies.remove('token');
     Cookies.remove('refreshToken');
+    navigate('/login');
   };
 
   return (

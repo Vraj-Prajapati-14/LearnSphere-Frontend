@@ -79,8 +79,10 @@ export default function SessionsSection({ sessions, courseId, handleDeleteSessio
                   >
                     Edit
                   </button>
+                
                   <button
                     className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition"
+                    
                     onClick={() => handleDeleteSession(session.id)}
                   >
                     Delete

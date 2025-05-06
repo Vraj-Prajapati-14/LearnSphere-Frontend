@@ -34,13 +34,13 @@ export default function InstructorStatistics() {
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user || !user.token) {
+    if (!user) {
       navigate('/login');
       return;
     }
 
     if (user.role !== 'Instructor') {
-      navigate('/unauthorized');
+      navigate('/login');
       return;
     }
 
