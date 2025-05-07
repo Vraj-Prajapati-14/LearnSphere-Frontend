@@ -9,6 +9,7 @@ export default function AuthForm({ isRegister }) {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const [apiError, setApiError] = useState(null);
   const [recaptchaToken, setRecaptchaToken] = useState('');
+  const [recaptchaKey, setRecaptchaKey] = useState(0); 
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,15 +40,22 @@ export default function AuthForm({ isRegister }) {
     }
   }, [location, login, navigate, API_URL]);
 
+  useEffect(() => {
+    if (!isRegister) {
+      setRecaptchaKey((prev) => prev + 1); 
+      setRecaptchaToken(''); 
+    }
+  }, [isRegister]);
+
   const onSubmit = async (data) => {
-    console.log(recaptchaToken);
-    
     if (!recaptchaToken) {
       setApiError('Please verify the CAPTCHA');
       return;
     }
+
     try {
       setApiError(null);
+
       if (isRegister) {
         await axios.post(`${API_URL}/auth/register`, {
           name: data.name,
@@ -58,6 +66,8 @@ export default function AuthForm({ isRegister }) {
         });
         navigate('/login');
       } else {
+        // Clear cookies before login to avoid session conflicts
+        document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
         const response = await axios.post(
           `${API_URL}/auth/login`,
           {
@@ -81,17 +91,18 @@ export default function AuthForm({ isRegister }) {
         }
       }
     } catch (error) {
-      setApiError(error.response?.data?.error || 'Something went wrong');
+      console.error('Auth error:', error.response?.data || error.message);
+      setApiError(error.response?.data?.error || 'Something went wrong. Please try again.');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-100 to-gray-300 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="bg-white p-8 rounded-lg shadow-md w-full max-w-md"
+        className="max-w-md w-full bg-white rounded-xl shadow-md p-8 hover:shadow-xl transition-all duration-300"
       >
-        <h2 className="text-2xl font-bold mb-6 text-center">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
           {isRegister ? 'Register' : 'Login'}
         </h2>
 
@@ -107,7 +118,7 @@ export default function AuthForm({ isRegister }) {
                 required: 'Name is required',
                 minLength: { value: 3, message: 'Name must be at least 3 characters long' },
               })}
-              className="mt-1 w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-gray-700"
             />
             {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name.message}</p>}
           </div>
@@ -124,7 +135,7 @@ export default function AuthForm({ isRegister }) {
               required: 'Email is required',
               pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email address' },
             })}
-            className="mt-1 w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-gray-700"
           />
           {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>}
         </div>
@@ -140,7 +151,7 @@ export default function AuthForm({ isRegister }) {
               required: 'Password is required',
               minLength: { value: 6, message: 'Password must be at least 6 characters' },
             })}
-            className="mt-1 w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-gray-700"
           />
           {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>}
         </div>
@@ -153,7 +164,7 @@ export default function AuthForm({ isRegister }) {
             <select
               id="role"
               {...register('role', { required: 'Role is required' })}
-              className="mt-1 w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm text-gray-700"
             >
               <option value="Student">Student</option>
               <option value="Instructor">Instructor</option>
@@ -163,27 +174,27 @@ export default function AuthForm({ isRegister }) {
         )}
 
         {apiError && <p className="mb-4 text-sm text-red-500 text-center">{apiError}</p>}
-        <VisibleRecaptcha onChange={(token) => setRecaptchaToken(token)} />
+        <VisibleRecaptcha key={recaptchaKey} onChange={(token) => setRecaptchaToken(token)} />
         <button
           type="submit"
-          className="w-full bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition"
+          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200 font-medium"
         >
           {isRegister ? 'Register' : 'Login'}
         </button>
 
-        <div className="mt-4">
-          <p className="text-center text-gray-600">or</p>
+        <div className="mt-6">
+          <p className="text-center text-gray-600 text-sm">or</p>
           <a
             href={`${API_URL}/auth/google`}
-            className="mt-2 w-full flex justify-center items-center bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition"
+            className="mt-2 w-full flex justify-center items-center bg-red-500 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-200 font-medium"
           >
             Continue with Google
           </a>
         </div>
 
-        <p className="mt-4 text-sm text-center">
+        <p className="mt-4 text-sm text-center text-gray-600">
           {isRegister ? 'Already have an account?' : 'Need an account?'}
-          <a href={isRegister ? '/login' : '/register'} className="text-blue-500 hover:underline ml-1">
+          <a href={isRegister ? '/login' : '/register'} className="text-indigo-500 hover:underline ml-1 font-medium">
             {isRegister ? 'Login' : 'Register'}
           </a>
         </p>
