@@ -10,7 +10,7 @@ import Navbar from './components/Navbar.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import EnrolledCourses from './components/EnrolledCourses.jsx';
 import CourseProgress from './components/CourseProgress.jsx';
-// import CourseCard from './components/CourseCard.jsx';
+import NotFound from './pages/NotFound.jsx';
 import CourseDetails from './components/CourseDetails.jsx';
 import InstructorStatistics from './components/InstructorStatistics.jsx';
 
@@ -22,13 +22,12 @@ function ProtectedRoute({ children }) {
 
 function App() {
   const { loading } = useAuth();
-  const location = useLocation(); // Use useLocation here
+  const location = useLocation(); 
 
   if (loading) return <div>Loading...</div>;
 
   return (
     <>
-      {/* Render Navbar only if the current route is not '/login' or '/register' */}
       {location.pathname !== '/login' && location.pathname !== '/register' && <Navbar />}
 
       <Routes>
@@ -115,7 +114,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<div>404 Not Found</div>} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

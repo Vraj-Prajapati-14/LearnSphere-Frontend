@@ -54,12 +54,11 @@ export default function CourseForm() {
 
 const onSubmit = async (formData) => {
   try {
-    // Ensure categoryId is an integer
     if (formData.categoryId) {
       formData.categoryId = parseInt(formData.categoryId, 10);
     }
 
-    console.log('Form Data:', formData);  // Log form data before sending
+    // console.log('Form Data:', formData);  
 
     if (courseId) {
       await axios.put(`${API_URL}/courses/${courseId}`, formData, {

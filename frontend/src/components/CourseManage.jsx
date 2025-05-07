@@ -6,7 +6,6 @@ import SessionsSection from './SessionsSection.jsx';
 import EnrolledStudentsSection from './EnrolledStudentsSection.jsx';
 import ReviewSection from './ReviewSection.jsx';
 
-// Error Boundary Component
 class ErrorBoundary extends Component {
   state = { hasError: false, error: null };
 
@@ -17,9 +16,9 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="text-center p-4 text-red-500 bg-red-100 rounded-md">
-          <p>Something went wrong: {this.state.error?.message || 'Unknown error'}</p>
-          <p>Please try refreshing the page or contact support.</p>
+        <div className="max-w-2xl w-full mx-4 p-6 bg-red-50 rounded-xl shadow-lg text-red-600 font-medium text-center">
+          <p className="font-semibold">Something went wrong:</p>
+          <p>{this.state.error?.message || 'Unknown error'}</p>
         </div>
       );
     }
@@ -48,29 +47,24 @@ export default function CourseManage() {
     setEnrollmentsError('');
     setProgressError('');
     try {
-      const courseResponse = await axiosAuth.get(`/courses/${courseId}`);
-      setCourse(courseResponse.data.data);
+      const [courseRes, sessionsRes, enrollmentsRes, progressRes] = await Promise.all([
+        axiosAuth.get(`/courses/${courseId}`),
+        axiosAuth.get(`/courses/${courseId}/sessions`),
+        axiosAuth.get(`/enrollments`, { params: { courseId } }),
+        axiosAuth.get(`/progress/course/${courseId}/progress`),
+      ]);
 
-      const sessionsResponse = await axiosAuth.get(`/courses/${courseId}/sessions`);
-      const sessionData = Array.isArray(sessionsResponse.data.data) ? sessionsResponse.data.data : [];
-      const validSessions = sessionData.filter((session) => session.id && !isNaN(parseInt(session.id)));
-      setSessions(validSessions);
+      setCourse(courseRes.data.data);
 
-      const enrollmentsResponse = await axiosAuth.get(`/enrollments`, { params: { courseId } });
-      const enrollmentData = enrollmentsResponse.data.data;
-      if (Array.isArray(enrollmentData)) {
-        setEnrollments(enrollmentData);
-      } else if (enrollmentData && typeof enrollmentData === 'object') {
-        setEnrollments([enrollmentData]);
-      } else {
-        setEnrollments([]);
-        setEnrollmentsError('Invalid enrollments data received');
-      }
+      const sessionData = Array.isArray(sessionsRes.data.data.sessions) ? sessionsRes.data.data.sessions : [];
+      setSessions(sessionData.filter((s) => s.id && !isNaN(Number(s.id))));
 
-      const progressResponse = await axiosAuth.get(`/progress/course/${courseId}/progress`);
-      const progressDataResult = progressResponse.data.data;
-      if (Array.isArray(progressDataResult)) {
-        const progressMap = progressDataResult.reduce((acc, item) => {
+      const enrollmentData = enrollmentsRes.data.data;
+      setEnrollments(Array.isArray(enrollmentData) ? enrollmentData : enrollmentData ? [enrollmentData] : []);
+
+      const progress = progressRes.data.data;
+      if (Array.isArray(progress)) {
+        const progressMap = progress.reduce((acc, item) => {
           acc[item.enrollmentId] = item;
           return acc;
         }, {});
@@ -79,167 +73,113 @@ export default function CourseManage() {
         setProgressError('Invalid progress data received');
       }
     } catch (err) {
-      const errorMessage =
-        err.response?.status === 401
-          ? 'Please log in to manage courses'
-          : err.response?.status === 403
-          ? 'Unauthorized: You are not the instructor of this course'
-          : err.response?.status === 404
-          ? 'Course not found'
-          : err.response?.status === 500
-          ? 'Server error: Failed to load course data. Please try again later.'
-          : err.response?.data?.error || 'Failed to load course data';
-      setError(errorMessage);
-      if (err.response?.status === 401) {
-        navigate('/login');
-      }
-      if (err.response?.config?.url?.includes('enrollments')) {
-        setEnrollmentsError('Failed to load enrollments');
-        setEnrollments([]);
-      }
-      if (err.response?.config?.url?.includes('progress')) {
-        setProgressError('Failed to load progress data');
-      }
+      const msg = err.response?.data?.error || 'Failed to load course data';
+      setError(
+        err.response?.status === 401 ? 'Please log in' :
+        err.response?.status === 403 ? 'Unauthorized access' :
+        err.response?.status === 404 ? 'Course not found' :
+        err.response?.status === 500 ? 'Server error. Try again later.' : msg
+      );
+      if (err.response?.status === 401) navigate('/login');
     }
   };
 
   useEffect(() => {
-    if (loading || !user) {
-      return;
+    if (!loading && user) {
+      fetchCourseData();
     }
-    fetchCourseData();
-  }, [courseId, user, loading, navigate]);
+  }, [courseId, user, loading]);
 
   const handleDeleteSession = async (sessionId) => {
-    if (!sessionId || isNaN(sessionId)) {
-      setError('Invalid session ID');
-      return;
-    }
     try {
-      const response = await axiosAuth.delete(`/courses/${courseId}/sessions/${sessionId}`);
-      setSessions(sessions.filter((s) => s.id !== sessionId));
-      alert(response.data.message || 'Session deleted successfully');
+      await axiosAuth.delete(`/courses/${courseId}/sessions/${sessionId}`);
       await fetchCourseData();
     } catch (err) {
-      const errorMessage =
-        err.response?.status === 401
-          ? 'Session expired, please log in again'
-          : err.response?.status === 403
-          ? 'Unauthorized: You are not the instructor of this course'
-          : err.response?.status === 404
-          ? 'Session not found'
-          : err.response?.status === 500
-          ? 'Server error: Failed to delete session. Please try again later.'
-          : err.response?.data?.error || 'Failed to delete session';
-      setError(errorMessage);
-      if (err.response?.status === 401) {
-        navigate('/login');
-      }
+      setError(err.response?.data?.error || 'Failed to delete session');
+      if (err.response?.status === 401) navigate('/login');
     }
   };
 
   const handleDeleteCourse = async () => {
+    if (!window.confirm('Are you sure you want to delete this course?')) return;
     try {
-      const confirmDelete = window.confirm('Are you sure you want to delete this course? This action cannot be undone.');
-      if (!confirmDelete) return;
-      const response = await axiosAuth.delete(`/courses/${courseId}`);
-      alert(response.data.message || 'Course deleted successfully');
+      await axiosAuth.delete(`/courses/${courseId}`);
       navigate('/dashboard');
     } catch (err) {
-      const errorMessage =
-        err.response?.status === 401
-          ? 'Session expired, please log in again'
-          : err.response?.status === 403
-          ? 'Unauthorized: You are not the instructor of this course'
-          : err.response?.status === 404
-          ? 'Course not found'
-          : err.response?.status === 500
-          ? 'Server error: Failed to delete course. Please try again later.'
-          : err.response?.data?.error || 'Failed to delete course';
-      setError(errorMessage);
-      if (err.response?.status === 401) {
-        navigate('/login');
-      }
+      setError(err.response?.data?.error || 'Failed to delete course');
+      if (err.response?.status === 401) navigate('/login');
     }
   };
 
   const handleUnenrollStudent = async (enrollmentId) => {
+    if (!window.confirm('Unenroll this student?')) return;
     try {
-      const confirmUnenroll = window.confirm('Are you sure you want to unenroll this student?');
-      if (!confirmUnenroll) return;
-      const response = await axiosAuth.delete(`/enrollments/${enrollmentId}`);
-      setEnrollments(enrollments.filter((e) => e.id !== enrollmentId));
-      setProgressData((prev) => {
+      await axiosAuth.delete(`/enrollments/${enrollmentId}`);
+      setEnrollments(enrollments.filter(e => e.id !== enrollmentId));
+      setProgressData(prev => {
         const newProgress = { ...prev };
         delete newProgress[enrollmentId];
         return newProgress;
       });
-      setCurrentPage(1);
-      alert(response.data.message || 'Student unenrolled successfully');
     } catch (err) {
-      const errorMessage =
-        err.response?.status === 401
-          ? 'Session expired, please log in again'
-          : err.response?.status === 403
-          ? 'Unauthorized: You cannot unenroll this student'
-          : err.response?.status === 404
-          ? 'Enrollment not found'
-          : err.response?.data?.error || 'Failed to unenroll student';
-      setError(errorMessage);
-      if (err.response?.status === 401) {
-        navigate('/login');
-      }
+      setError(err.response?.data?.error || 'Failed to unenroll student');
+      if (err.response?.status === 401) navigate('/login');
     }
   };
 
   const handleSort = (field) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
+    setSortBy(prev => field);
+    setSortOrder(prev => sortBy === field && sortOrder === 'asc' ? 'desc' : 'asc');
     setCurrentPage(1);
   };
 
   return (
     <ErrorBoundary>
-      <div className="max-w-5xl mx-auto p-6 bg-gray-50 dark:bg-gray-800 min-h-screen">
-        {error && (
-          <p className="text-red-500 text-center p-4 mb-4 rounded-md bg-red-100 dark:bg-red-800/30 dark:text-red-200">
-            {error}
-          </p>
-        )}
-        {loading && (
-          <p className="text-gray-600 dark:text-gray-200 text-center p-4">Loading...</p>
-        )}
-        {!loading && !course && !error && (
-          <p className="text-gray-600 dark:text-gray-200 text-center p-4">Loading course data...</p>
-        )}
-        {course && (
-          <>
-            <CourseHeader course={course} courseId={courseId} handleDeleteCourse={handleDeleteCourse} />
-            <SessionsSection
-              sessions={sessions}
-              courseId={courseId}
-              handleDeleteSession={handleDeleteSession}
-            />
-            <EnrolledStudentsSection
-              enrollments={enrollments}
-              progressData={progressData}
-              enrollmentsError={enrollmentsError}
-              progressError={progressError}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              handleSort={handleSort}
-              currentPage={currentPage}
-              pageSize={pageSize}
-              setCurrentPage={setCurrentPage}
-              handleUnenrollStudent={handleUnenrollStudent}
-            />
-            <ReviewSection courseId={courseId} user={user} />
-          </>
-        )}
+      <div className="min-h-screen w-full bg-gradient-to-br from-gray-100 to-gray-300 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {error && (
+            <div className="max-w-2xl w-full mx-4 p-6 bg-red-50 rounded-xl shadow-lg text-red-600 font-medium text-center mb-6">
+              {error}
+            </div>
+          )}
+          {loading && (
+            <div className="flex justify-center items-center min-h-screen text-gray-700 text-xl font-medium animate-pulse">
+              Loading...
+            </div>
+          )}
+          {!loading && course && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-xl transition-all duration-300">
+                <CourseHeader course={course} courseId={courseId} handleDeleteCourse={handleDeleteCourse} />
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-xl transition-all duration-300">
+                <SessionsSection
+                  sessions={sessions}
+                  courseId={courseId}
+                  handleDeleteSession={handleDeleteSession}
+                />
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-xl transition-all duration-300">
+                <EnrolledStudentsSection
+                  enrollments={enrollments}
+                  progressData={progressData}
+                  enrollmentsError={enrollmentsError}
+                  progressError={progressError}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  handleSort={handleSort}
+                  currentPage={currentPage}
+                  pageSize={pageSize}
+                  setCurrentPage={setCurrentPage}
+                  handleUnenrollStudent={handleUnenrollStudent}
+                />
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-xl transition-all duration-300">
+                <ReviewSection courseId={courseId} user={user} />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </ErrorBoundary>
   );

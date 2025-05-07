@@ -1,43 +1,40 @@
-import { useState } from 'react';
-import PropTypes from 'prop-types';
+import React from 'react';
 
-const Pagination = ({ totalPages, initialPage = 1, onPageChange }) => {
-  const [currentPage, setCurrentPage] = useState(initialPage);
+const Pagination = ({ pagination, onPageChange }) => {
+  const { page, totalPages, hasNext } = pagination;
+
+  if (!pagination || (totalPages <= 1 && !hasNext)) {
+    return null;
+  }
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
+      // console.log('Pagination click:', newPage);
       onPageChange(newPage);
     }
   };
 
   return (
-    <div className="flex justify-center space-x-2 mt-4">
+    <div className="flex items-center justify-center space-x-4 mt-8">
       <button
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md disabled:opacity-50 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+        onClick={() => handlePageChange(page - 1)}
+        disabled={page === 1}
+        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
       >
         Previous
       </button>
-      <span className="px-4 py-2 text-gray-700 dark:text-gray-200">
-        Page {currentPage} of {totalPages}
+      <span className="text-gray-700 font-medium">
+        Page {page} of {totalPages}
       </span>
       <button
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md disabled:opacity-50 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+        onClick={() => handlePageChange(page + 1)}
+        disabled={!hasNext}
+        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
       >
         Next
       </button>
     </div>
   );
-};
-
-Pagination.propTypes = {
-  totalPages: PropTypes.number.isRequired,
-  initialPage: PropTypes.number,
-  onPageChange: PropTypes.func.isRequired,
 };
 
 export default Pagination;

@@ -1,15 +1,52 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const Pagination = ({ pagination, onPageChange }) => {
+  const { page, totalPages, hasNext } = pagination;
+
+  if (!pagination || (totalPages <= 1 && !hasNext)) return null;
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      onPageChange(newPage);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center space-x-2 my-6">
+      <button
+        onClick={() => handlePageChange(page - 1)}
+        disabled={page === 1}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+      >
+        Previous
+      </button>
+      <span className="text-gray-700">
+        Page {page} of {totalPages}
+      </span>
+      <button
+        onClick={() => handlePageChange(page + 1)}
+        disabled={!hasNext}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+      >
+        Next
+      </button>
+    </div>
+  );
+};
+
 export default function Dashboard() {
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, axiosAuth } = useAuth();
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const API_URL = import.meta.env.VITE_API_URL;
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    hasNext: false,
+  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -19,23 +56,25 @@ export default function Dashboard() {
       return;
     }
 
-    // Redirect if user is not an Instructor
     if (user.role !== 'Instructor') {
-      navigate('/login'); // or navigate('/unauthorized')
+      navigate('/login');
       return;
     }
 
     const loadInstructorCourses = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/courses?instructorId=${user.id}`, {
-          withCredentials: true, // Send httpOnly token cookie
-        });
+        const response = await axiosAuth.get(
+          `/courses?instructorId=${user.id}&page=${pagination.page}&limit=10`
+        );
 
-        console.log('Courses response:', response.data);
-        setCourses(response.data.data || []);
+        setCourses(response.data.data.courses || []);
+        setPagination({
+          page: response.data.data.page || 1,
+          totalPages: response.data.data.totalPages || 1,
+          hasNext: response.data.data.hasNext || false,
+        });
       } catch (err) {
-        console.error('Courses fetch error:', err.response?.data || err.message);
         setError(err.response?.data?.error || 'Failed to fetch courses');
       } finally {
         setLoading(false);
@@ -43,11 +82,10 @@ export default function Dashboard() {
     };
 
     loadInstructorCourses();
-  }, [authLoading, user, navigate, API_URL]);
+  }, [authLoading, user, navigate, pagination.page, axiosAuth]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handlePageChange = (newPage) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   if (authLoading || loading) {
@@ -61,40 +99,47 @@ export default function Dashboard() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+          <h1 className="text-2xl font-bold text-gray-800">
             Welcome, {user.name} (Instructor)
           </h1>
           <button
-            onClick={handleLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+            onClick={() => navigate(`/courses/add`)}
+            className="bg-green-600 text-white px-6 py-2 rounded-lg shadow hover:bg-green-700 transition duration-200"
           >
-            Logout
+            + Create New Course
           </button>
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold mb-4">Your Courses</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Your Courses</h2>
           {courses.length === 0 ? (
             <p className="text-gray-600">No courses created yet.</p>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {courses.map((course) => (
                 <div
                   key={course.id}
-                  className="bg-white p-4 rounded-lg shadow-md flex justify-between items-center"
+                  className="bg-white p-5 rounded-xl border shadow hover:shadow-md transition"
                 >
-                  <div>
-                    <h3 className="text-lg font-medium">{course.title}</h3>
-                    <p className="text-gray-600">{course.description}</p>
-                    <p className="text-sm">Status: {course.isPublished ? 'Published' : 'Draft'}</p>
-                  </div>
-                  <div className="flex gap-2">
+                  <h3 className="text-lg font-bold text-gray-800">{course.title}</h3>
+                  <p className="text-gray-600 text-sm mt-1">{course.description}</p>
+                  <p className="text-sm mt-2">
+                    <span className="font-medium text-gray-700">Status:</span>{' '}
+                    <span
+                      className={`font-semibold ${
+                        course.isPublished ? 'text-green-600' : 'text-yellow-500'
+                      }`}
+                    >
+                      {course.isPublished ? 'Published' : 'Draft'}
+                    </span>
+                  </p>
+                  <div className="mt-4 flex justify-end">
                     <button
                       onClick={() => navigate(`/courses/${course.id}/manage`)}
-                      className="bg-purple-600 text-white px-3 py-1 rounded-md hover:bg-purple-700"
+                      className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition"
                     >
                       Manage
                     </button>
@@ -103,13 +148,9 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-          <button
-            onClick={() => navigate(`/courses/add`)}
-            className="mt-4 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
-          >
-            Create New Course
-          </button>
         </div>
+
+        <Pagination pagination={pagination} onPageChange={handlePageChange} />
       </div>
     </div>
   );

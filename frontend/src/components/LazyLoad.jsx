@@ -1,63 +1,43 @@
-import { useEffect, useRef, useCallback } from 'react';
-import PropTypes from 'prop-types';
+import React, { useEffect, useRef } from 'react';
 
-const LazyLoad = ({ onLoadMore, hasMore, loadMoreButton = false, children }) => {
+const LazyLoad = ({ onLoadMore, hasMore }) => {
   const observerRef = useRef(null);
-  const containerRef = useRef(null);
-
-  const handleObserver = useCallback(
-    (entries) => {
-      const target = entries[0];
-      if (target.isIntersecting && hasMore) {
-        onLoadMore();
-      }
-    },
-    [hasMore, onLoadMore]
-  );
 
   useEffect(() => {
-    if (loadMoreButton || !hasMore) return;
+    console.log('LazyLoad useEffect:', { hasMore });
 
-    const observer = new IntersectionObserver(handleObserver, {
-      root: null,
-      rootMargin: '100px',
-      threshold: 0.1,
-    });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        console.log('IntersectionObserver triggered:', {
+          isIntersecting: entries[0].isIntersecting,
+          hasMore,
+        });
+        if (entries[0].isIntersecting && hasMore) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
     }
 
     return () => {
-      if (containerRef.current) {
-        observer.unobserve(containerRef.current);
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
       }
     };
-  }, [handleObserver, loadMoreButton, hasMore]);
+  }, [hasMore, onLoadMore]);
 
   return (
-    <div className="space-y-4">
-      {children}
-      {loadMoreButton && hasMore && (
-        <div className="flex justify-center mt-4">
-          <button
-            onClick={onLoadMore}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
-          >
-            Load More
-          </button>
-        </div>
-      )}
-      <div ref={containerRef} className="h-1" />
+    <div
+      ref={observerRef}
+      className="h-10 flex items-center justify-center text-gray-500"
+    >
+      {hasMore ? 'Loading more...' : 'No more items'}
     </div>
   );
-};
-
-LazyLoad.propTypes = {
-  onLoadMore: PropTypes.func.isRequired,
-  hasMore: PropTypes.bool.isRequired,
-  loadMoreButton: PropTypes.bool,
-  children: PropTypes.node.isRequired,
 };
 
 export default LazyLoad;

@@ -2,13 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
-
-import '@tiptap/extension-text-style';
-import 'prosemirror-view/style/prosemirror.css';
+import TiptapEditor from './TiptapEditor.jsx';
 
 export default function SessionForm() {
   const { courseId, sessionId } = useParams();
@@ -22,6 +16,7 @@ export default function SessionForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [editor, setEditor] = useState(null); 
 
   const isEditMode = Boolean(sessionId);
 
@@ -34,7 +29,7 @@ export default function SessionForm() {
       const data = response.data.data;
       setTitle(data.title);
       setYoutubeLink(data.youtubeLink);
-      setExplanation(data.explanation);
+      setExplanation(data.explanation || '<p></p>'); 
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch session data');
     }
@@ -45,9 +40,17 @@ export default function SessionForm() {
   }, [isEditMode]);
 
   useEffect(() => {
+    if (editor && explanation) {
+      editor.commands.setContent(explanation);
+    }
+  }, [editor, explanation]);
+
+  useEffect(() => {
     if (youtubeLink) {
       const id = extractVideoIdFromUrl(youtubeLink);
       if (id) setThumbnailUrl(`https://img.youtube.com/vi/${id}/hqdefault.jpg`);
+    } else {
+      setThumbnailUrl('');
     }
   }, [youtubeLink]);
 
@@ -55,24 +58,6 @@ export default function SessionForm() {
     const regex = /(?:youtube\.com\/(?:[^/]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     return url.match(regex) ? url.match(regex)[1] : null;
   };
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      Link.configure({ openOnClick: false }),
-    ],
-    content: explanation,
-    onUpdate: ({ editor }) => {
-      setExplanation(editor.getHTML());
-    },
-  });
-
-  useEffect(() => {
-    if (editor && explanation !== editor.getHTML()) {
-      editor.commands.setContent(explanation);
-    }
-  }, [editor, explanation]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,16 +83,16 @@ export default function SessionForm() {
     }
   };
 
-  if (!editor) return null;
-
   return (
-    <div className="min-h-screen py-12 px-4 bg-gray-50">
-      <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-8">
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-100 to-gray-200 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-xl p-8">
         <h1 className="text-3xl font-semibold mb-6 text-gray-800">
           {isEditMode ? 'Edit Session' : 'Create New Session'}
         </h1>
 
-        {error && <p className="text-red-600 mb-4">{error}</p>}
+        {error && (
+          <p className="text-red-600 bg-red-50 p-3 rounded-lg mb-6 text-sm">{error}</p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -116,7 +101,7 @@ export default function SessionForm() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               required
             />
           </div>
@@ -127,7 +112,7 @@ export default function SessionForm() {
               type="text"
               value={youtubeLink}
               onChange={(e) => setYoutubeLink(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               required
             />
           </div>
@@ -135,56 +120,23 @@ export default function SessionForm() {
           {thumbnailUrl && (
             <div>
               <label className="block text-gray-700 font-medium mb-2">Video Thumbnail</label>
-              <img src={thumbnailUrl} alt="Thumbnail" className="rounded-md w-full h-auto" />
+              <img
+                src={thumbnailUrl}
+                alt="Thumbnail"
+                className="rounded-lg w-full h-auto shadow-sm"
+              />
             </div>
           )}
 
           <div>
             <label className="block text-gray-700 font-medium mb-2">Explanation</label>
-
-            <div className="flex flex-wrap gap-2 mb-3">
-              {[
-                { label: 'Bold', action: () => editor.chain().focus().toggleBold().run(), isActive: editor.isActive('bold') },
-                { label: 'Italic', action: () => editor.chain().focus().toggleItalic().run(), isActive: editor.isActive('italic') },
-                { label: 'Underline', action: () => editor.chain().focus().toggleUnderline().run(), isActive: editor.isActive('underline') },
-                { label: 'H1', action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), isActive: editor.isActive('heading', { level: 1 }) },
-                { label: 'H2', action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), isActive: editor.isActive('heading', { level: 2 }) },
-                { label: 'List', action: () => editor.chain().focus().toggleBulletList().run(), isActive: editor.isActive('bulletList') },
-                { label: 'Code', action: () => editor.chain().focus().toggleCodeBlock().run(), isActive: editor.isActive('codeBlock') },
-                {
-                  label: 'Link',
-                  action: () => {
-                    const url = prompt('Enter URL');
-                    if (url) editor.chain().focus().setLink({ href: url }).run();
-                    else editor.chain().focus().unsetLink().run();
-                  },
-                  isActive: editor.isActive('link'),
-                },
-              ].map(({ label, action, isActive }) => (
-                <button
-                  type="button"
-                  key={label}
-                  onClick={action}
-                  className={`px-3 py-1 text-sm rounded-md border ${
-                    isActive
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="border border-gray-300 rounded-md p-3 min-h-[150px] prose max-w-none bg-white">
-              <EditorContent editor={editor} />
-            </div>
+            <TiptapEditor content={explanation} onUpdate={setExplanation} setEditor={setEditor} />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 rounded-md text-white font-medium bg-blue-600 hover:bg-blue-700 transition"
+            className="w-full py-2 px-4 rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Session' : 'Create Session')}
           </button>

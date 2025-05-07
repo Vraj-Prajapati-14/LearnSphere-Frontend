@@ -31,7 +31,7 @@ const Navbar = () => {
                 <>
                   <Link to="/studentdashboard" className="hover:underline">All Courses</Link>
                   <Link to="/enrolled-courses" className="hover:underline">Enrolled Courses</Link>
-                  <Link to="/progress" className="hover:underline">Progress</Link>
+                  {/* <Link to="/progress" className="hover:underline">Progress</Link> */}
                 </>
               )}
 
@@ -42,7 +42,6 @@ const Navbar = () => {
                 </>
               )}
 
-              {/* Profile Dropdown */}
               <div className="relative">
                 <button
                   onClick={toggleMenu}
@@ -53,13 +52,13 @@ const Navbar = () => {
 
                 {menuOpen && (
                   <div className="absolute right-0 mt-2 bg-white text-black rounded shadow-lg w-40 z-50">
-                    <Link
+                    {/* <Link
                       to="/profile"
                       className="block px-4 py-2 hover:bg-gray-100"
                       onClick={() => setMenuOpen(false)}
                     >
                       Profile
-                    </Link>
+                    </Link> */}
                     <button
                       onClick={() => {
                         handleLogout();

@@ -113,7 +113,7 @@ export default function EnrolledStudentsSection({
                 </tbody>
               </table>
             </div>
-            {/* Pagination Controls */}
+       
             {totalPages > 1 && (
               <div className="mt-4 flex justify-between items-center">
                 <div>
